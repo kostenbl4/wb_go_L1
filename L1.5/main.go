@@ -7,37 +7,31 @@ import (
 	"time"
 )
 
-func writeChannel(wg *sync.WaitGroup, ctx context.Context, c chan int) {
+func writeChannel(wg *sync.WaitGroup, ctx context.Context, c chan<- int) {
 	defer wg.Done()
 	for i := 0; ; i++ {
 		select {
 		case <-ctx.Done():
+			close(c) // Закрываем канал здесь
 			return
-		default:
-			c <- i
+		case c <- i:
 		}
 	}
 }
 
-func readChannel(wg *sync.WaitGroup, ctx context.Context, c chan int) {
+func readChannel(wg *sync.WaitGroup, c <-chan int) {
 	defer wg.Done()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			fmt.Println(<-c)
-		}
+	for elem := range c {
+		fmt.Println(elem)
 	}
 }
 
 func main() {
 	var n int
+	fmt.Print("Enter duration in seconds: ")
+	fmt.Scanln(&n)
 
-	fmt.Scan(&n)
-
-	c := make(chan int, 1)
-	defer close(c)
+	c := make(chan int)
 
 	ctx := context.Background()
 	dur := time.Duration(n) * time.Second
@@ -48,8 +42,8 @@ func main() {
 	wg.Add(2)
 
 	go writeChannel(&wg, ctx, c)
+	go readChannel(&wg, c)
 
-	go readChannel(&wg, ctx, c)
-	
 	wg.Wait()
+	fmt.Println("Program finished")
 }

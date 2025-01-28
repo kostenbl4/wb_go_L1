@@ -3,55 +3,72 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 )
 
-func work(wg *sync.WaitGroup, in chan any, ctx context.Context, id int) {
+func worker(wg *sync.WaitGroup, in <-chan any, ctx context.Context, id int) {
 	defer wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Printf("worker %d exiting\n", id)
 			return
-		default:
-			time.Sleep(1 * time.Second)
-			fmt.Printf("worker %d got value %v\n", id, <-in)
-		}
-	}
-}
-
-func startWorkers(wg *sync.WaitGroup, in chan any, ctx context.Context, n int) {
-	for i := 0; i < n; i++ {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			go work(wg, in, ctx, i)
+		case val, ok := <-in:
+			if !ok { // Канал закрыт, завершаем воркер
+				fmt.Printf("worker %d exiting (channel closed)\n", id)
+				return
+			}
+			fmt.Printf("worker %d got value %v\n", id, val)
 		}
 	}
 }
 
 func main() {
 	var n int
-	fmt.Scan(&n)
+	fmt.Print("Enter the number of workers: ")
+	fmt.Scanln(&n)
 
 	mainChannel := make(chan any)
-	defer close(mainChannel)
 
 	var wg sync.WaitGroup
 	wg.Add(n)
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	
-	go startWorkers(&wg, mainChannel, ctx, n)
-	
-	go func(){
-		for i := 0; ; i++ {
-			mainChannel <- i
-		}	
+	ctx, cancel := context.WithCancel(context.Background())
+
+	for i := 0; i < n; i++ {
+		go worker(&wg, mainChannel, ctx, i)
+	}
+
+	// Горутина для записи данных в канал
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				mainChannel <- i
+				i++
+				time.Sleep(500 * time.Millisecond) // Задержка для наглядности
+			}
+		}
 	}()
-	
-	wg.Wait()
+
+	// Обработка Ctrl+C
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
+	<-c // Блокируем main до получения сигнала
+
+	fmt.Println("Shutting down...")
+	cancel() // Отменяем контекст, чтобы воркеры завершились
+
+	close(mainChannel) // Закрываем канал после отмены контекста
+	wg.Wait()          // Ждем завершения всех воркеров
+
+	fmt.Println("All workers exited.")
 }
