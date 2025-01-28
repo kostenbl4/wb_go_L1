@@ -39,7 +39,7 @@ func (p *point) DistanceTo(other Point) float64 {
 func main() {
 	// Пример использования
 	var p1, p2 Point = NewPoint(1, 2), NewPoint(4, 6)
-	
+
 	fmt.Printf("Точка 1: x=%.2f, y=%.2f\n", p1.X(), p1.Y())
 	fmt.Printf("Точка 2: x=%.2f, y=%.2f\n", p2.X(), p2.Y())
 

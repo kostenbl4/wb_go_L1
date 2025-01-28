@@ -1,20 +1,20 @@
 package main
 
 import (
-	"strings"
+	"unicode"
 )
 
 func isAllUnique(s string) bool {
 	// Создание множества для хранения уникальных символов
 	set := make(map[rune]struct{})
-	s = strings.ToLower(s) // Приведение строки к нижнему регистру
 
 	// Перебор всех символов строки
 	for _, r := range s {
-		if _, ok := set[r]; ok {
+		lowerR := unicode.ToLower(r) // Приведение символа к нижнему регистру
+		if _, ok := set[lowerR]; ok {
 			return false
 		}
-		set[r] = struct{}{}
+		set[lowerR] = struct{}{}
 	}
 
 	return true
